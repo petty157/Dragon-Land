@@ -1,4 +1,3 @@
-```markdown
 # 🐉 Dragon Land Asset Inspector & Dumper (`dl_dumper_gui`)
 
 [![Python Version](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/)
@@ -27,9 +26,7 @@ Ensure Python 3.7+ is installed. Install `paramiko` for iOS SFTP transfers:
 
 ```bash
 pip install paramiko
-
 ```
-
 ---
 
 ## 🤖 Android Setup Guide
@@ -173,5 +170,3 @@ Android/data/es.socialpoint.DragonLand/
 This project is licensed under the [MIT License](https://www.google.com/search?q=LICENSE).
 
 *Disclaimer: This tool is intended for personal data preservation and game archiving purposes. Dragon Land is a registered trademark of Social Point.*
-
-```
