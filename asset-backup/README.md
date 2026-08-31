@@ -175,5 +175,3 @@ This project is licensed under the [MIT License](https://www.google.com/search?q
 *Disclaimer: This tool is intended for personal data preservation and game archiving purposes. Dragon Land is a registered trademark of Social Point.*
 
 ```
-
-```
