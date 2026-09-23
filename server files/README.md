@@ -1,148 +1,290 @@
 # Game Backend Server
 
-A Go implementation of your mobile game backend API.
+A Go-based backend server for a mobile game, implementing the API required for user authentication, state synchronization, analytics, rewards, leaderboards, and other game services.
+
+## Features
+
+* User login and registration
+* Session validation
+* Player state synchronization
+* Daily login rewards
+* In-game leaderboards
+* Account linking
+* Analytics and heartbeat tracking
+* Crash and exception reporting
+* Payment processing endpoints
+* Batch command and query processing
+* SQLite database storage
+* Nginx reverse proxy support
+* HTTPS with Let's Encrypt
+* systemd service support
+
+> Multiplayer functionality is currently disabled and can be enabled when the required backend implementation is ready.
 
 ---
 
-## What You Need
+## API
 
-| Requirement | Details |
-|---|---|
-| **A VPS / Cloud Server** | Ubuntu 22.04 recommended. DigitalOcean, Hetzner, AWS EC2, Linode, Vultr all work. Min: 1 vCPU / 1 GB RAM |
-| **Your domain** | You already have this ✓ |
-| **Go 1.21+** | Install via `apt` or from golang.org |
-| **GCC / build-essential** | Required to compile the SQLite driver (`go-sqlite3`) |
-| **Nginx** | Reverse proxy + SSL termination |
-| **Certbot** | Free SSL certificate (Let's Encrypt) |
+| Endpoint                                  | Method | Description                  |
+| ----------------------------------------- | ------ | ---------------------------- |
+| `/api/v3/{userId}/{deviceUid}/user/login` | `POST` | Login or register a user     |
+| `/api/v3/{userId}/{deviceUid}/packet`     | `POST` | Execute commands and queries |
+| `/health`                                 | `GET`  | Server health check          |
 
----
+### Supported Commands
 
-## Endpoints Implemented
+Commands are sent through the `raw_packet` field.
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/v3/{userId}/{deviceUid}/user/login` | POST | Login / register user |
-| `/api/v3/{userId}/{deviceUid}/packet` | POST | Execute batch commands+queries |
-| `/health` | GET | Health check |
+* `login`
+* `process_daily_reward`
+* `session_validate`
+* `add_link`
+* `confirmLink`
+* `analytics.heartbeat`
+* `analytics.finish`
+* `process_payment`
+* `report_exception`
+* `report_crash`
+* `sync`
+* `dl.command.sync`
+* `log_exception`
+* `track`
+* `unsafe_track`
+* `copy_state`
 
-## 2.5.1 feature flags (v4 archive)
+### Supported Queries
 
-| Feature | Status |
-|---------|--------|
-| Daily login rewards | **On** — `user_data.daily_bonus` on login, `process_daily_reward` command |
-| In-game leaderboards | **On** — `GET …/social_leaderboards` returns campaign + fast track boards |
-| Multiplayer | **Off** — `fetch_flags.multiplayer_enabled: false`; race commands return `coming_soon` |
-
-Flip `multiplayerEnabled()` in `leaderboards.go` when MP ships.
-
-## Commands (inside `raw_packet`)
-- `login` — Login, create user if new
-- `process_daily_reward` — Claim daily login gem calendar
-- `session_validate` — Check if session is valid
-- `add_link` — Link identity provider account
-- `confirmLink` — Confirm/cancel a link
-- `analytics.heartbeat` — Heartbeat ping
-- `analytics.finish` — Session length report
-- `process_payment` — iTunes/Google Play payment
-- `report_exception` — Client exception dump
-- `report_crash` — Client crash dump
-- `sync` — Store arbitrary key/value data
-- `dl.command.sync` — Update user state
-- `log_exception` — Log exception with severity
-- `track` — Track analytics events
-- `unsafe_track` — Track events without auth
-- `copy_state` — Copy user state between accounts
-
-## Queries (inside `raw_packet`)
-- `login_response`, `force_upgrade`, `linked_accounts`, `link_mapping`
-- `external_ids_map`, `user_basic_info`, `app_data`, `user`, `config`
-- `last_tracked_events`, `last_tracked_users`
+* `login_response`
+* `force_upgrade`
+* `linked_accounts`
+* `link_mapping`
+* `external_ids_map`
+* `user_basic_info`
+* `app_data`
+* `user`
+* `config`
+* `last_tracked_events`
+* `last_tracked_users`
 
 ---
 
-## Setup (Ubuntu 22.04)
+## 2.5.1 Feature Set
 
-### 1. Point your domain DNS
-Add an **A record** pointing `yourdomain.com` (or `api.yourdomain.com`) to your server's IP address.
+The current backend includes the following archived 2.5.1-era functionality:
 
-### 2. SSH into your server and install dependencies
+| Feature              | Status   |
+| -------------------- | -------- |
+| Daily login rewards  | Enabled  |
+| In-game leaderboards | Enabled  |
+| Multiplayer          | Disabled |
+
+Daily rewards are handled through `user_data.daily_bonus` and the `process_daily_reward` command.
+
+Leaderboards are exposed through the `social_leaderboards` endpoint and currently provide campaign and fast-track boards.
+
+Multiplayer-related commands currently return `coming_soon`.
+
+To enable multiplayer once implemented, update `multiplayerEnabled()` in `leaderboards.go`.
+
+---
+
+## Requirements
+
+| Requirement | Details                   |
+| ----------- | ------------------------- |
+| OS          | Ubuntu 22.04+ recommended |
+| CPU         | 1 vCPU minimum            |
+| RAM         | 1 GB minimum              |
+| Go          | 1.21+                     |
+| GCC         | Required by `go-sqlite3`  |
+| Nginx       | Reverse proxy / HTTPS     |
+| Certbot     | Let's Encrypt SSL         |
+
+The server can be hosted on providers such as DigitalOcean, Hetzner, AWS EC2, Linode, or Vultr.
+
+You will also need a domain pointing to your server.
+
+---
+
+# Installation
+
+## 1. Clone the repository
 
 ```bash
-sudo apt update && sudo apt upgrade -y
+git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
+cd YOUR_REPOSITORY
+```
+
+## 2. Install dependencies
+
+```bash
+sudo apt update
 sudo apt install -y golang-go build-essential nginx certbot python3-certbot-nginx
 ```
 
-> **Note:** `build-essential` (GCC) is required because the `go-sqlite3` driver uses CGo.
-
-If you need Go 1.21+ and your distro ships an older version, install directly from golang.org:
+Check your Go version:
 
 ```bash
-wget https://go.dev/dl/go1.21.0.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-source ~/.bashrc
+go version
 ```
 
-### 3. Upload and build the server
+Go 1.21 or newer is recommended.
+
+If your distribution provides an older version, install Go directly from the official Go distribution.
+
+---
+
+## 3. Build the server
+
+Install the Go dependencies:
 
 ```bash
-# Create app directory
+go mod tidy
+```
+
+Build the server:
+
+```bash
+go build -o game_server .
+```
+
+---
+
+## 4. Run locally
+
+Start the server:
+
+```bash
+./game_server
+```
+
+The backend should start listening on its configured port.
+
+You can then test the health endpoint:
+
+```bash
+curl http://127.0.0.1:8080/health
+```
+
+Press `Ctrl+C` to stop the server.
+
+---
+
+# Production Deployment
+
+## 1. Create the application directory
+
+```bash
 sudo mkdir -p /opt/game_server
 sudo chown $USER:$USER /opt/game_server
+```
 
-# Copy your files there
-cp main.go database.go go.mod go.sum gameData.json /opt/game_server/
+Copy or clone the repository into the directory:
 
-# Build the binary
-cd /opt/game_server
+```bash
+cd /opt
+git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git game_server
+cd game_server
+```
+
+Build it:
+
+```bash
 go mod tidy
 go build -o game_server .
 ```
 
-### 4. Test it runs locally first
+---
 
-```bash
-cd /opt/game_server
-./game_server
-# Press Ctrl+C when confirmed working
+## 2. Configure DNS
+
+Create an `A` record for your domain pointing to your server's public IP.
+
+For example:
+
+```text
+api.example.com → YOUR_SERVER_IP
 ```
 
-### 5. Set up Nginx
+Make sure DNS has propagated before requesting the SSL certificate.
+
+---
+
+## 3. Configure Nginx
+
+Create a site configuration:
 
 ```bash
-sudo tee /etc/nginx/sites-available/game_server > /dev/null <<'EOF'
+sudo nano /etc/nginx/sites-available/game_server
+```
+
+Example:
+
+```nginx
 server {
     listen 80;
-    server_name yourdomain.com;
+    server_name api.example.com;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
-EOF
+```
 
-# Edit: replace yourdomain.com with your real domain
-sudo nano /etc/nginx/sites-available/game_server
+Enable the configuration:
 
-# Enable it
-sudo ln -s /etc/nginx/sites-available/game_server /etc/nginx/sites-enabled/
+```bash
+sudo ln -s /etc/nginx/sites-available/game_server /etc/nginx/sites-enabled/game_server
+```
+
+Test Nginx:
+
+```bash
 sudo nginx -t
+```
+
+Reload:
+
+```bash
 sudo systemctl reload nginx
 ```
 
-### 6. Get free SSL certificate
+---
+
+## 4. Enable HTTPS
+
+Run Certbot:
 
 ```bash
-sudo certbot --nginx -d yourdomain.com
-sudo systemctl reload nginx
+sudo certbot --nginx -d api.example.com
 ```
 
-### 7. Install as a system service (auto-start on reboot)
+Certbot will configure the Let's Encrypt certificate and HTTPS automatically.
+
+Test the deployment:
 
 ```bash
-sudo tee /etc/systemd/system/game_server.service > /dev/null <<'EOF'
+curl https://api.example.com/health
+```
+
+---
+
+# systemd Service
+
+To automatically start the backend after a reboot, create:
+
+```bash
+sudo nano /etc/systemd/system/game_server.service
+```
+
+Use:
+
+```ini
 [Unit]
 Description=Game Backend Server
 After=network.target
@@ -157,34 +299,36 @@ RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-EOF
+```
 
+Then enable and start it:
+
+```bash
 sudo systemctl daemon-reload
 sudo systemctl enable game_server
 sudo systemctl start game_server
+```
 
-# Check it's running
+Check the service:
+
+```bash
 sudo systemctl status game_server
-sudo journalctl -u game_server -f   # live logs
+```
+
+View live logs:
+
+```bash
+sudo journalctl -u game_server -f
 ```
 
 ---
 
-## Building Locally (Development)
+# API Examples
+
+## Login
 
 ```bash
-make deps    # go mod tidy
-make build   # compiles to ./game_server
-make run     # build + run
-```
-
----
-
-## API Usage Examples
-
-### Login
-```bash
-curl -X POST https://yourdomain.com/api/v3/1001/device-abc-123/user/login \
+curl -X POST https://api.example.com/api/v3/1001/device-abc-123/user/login \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": 1001,
@@ -192,7 +336,6 @@ curl -X POST https://yourdomain.com/api/v3/1001/device-abc-123/user/login \
     "security_token": "aaaabbbbccccddddeeeeffffgggghhhh",
     "client_version": 42,
     "client_bundle_version": "1.2.3",
-    "client_ip": "1.2.3.4",
     "client_language": "en",
     "username": "PlayerOne",
     "device_os": "iOS 17.0",
@@ -200,7 +343,8 @@ curl -X POST https://yourdomain.com/api/v3/1001/device-abc-123/user/login \
   }'
 ```
 
-**Response:**
+Example response:
+
 ```json
 {
   "ok": true,
@@ -212,9 +356,12 @@ curl -X POST https://yourdomain.com/api/v3/1001/device-abc-123/user/login \
 }
 ```
 
-### Packet Execution (batch commands + queries)
+## Packet Execution
+
+Commands and queries can be sent together through `raw_packet`:
+
 ```bash
-curl -X POST https://yourdomain.com/api/v3/1001/device-abc-123/packet \
+curl -X POST https://api.example.com/api/v3/1001/device-abc-123/packet \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": 1001,
@@ -223,42 +370,99 @@ curl -X POST https://yourdomain.com/api/v3/1001/device-abc-123/packet \
   }'
 ```
 
-**Response:**
+Example response:
+
 ```json
 {
   "commands": [
-    {"name": "sync", "ok": true, "key": "gold"}
+    {
+      "name": "sync",
+      "ok": true,
+      "key": "gold"
+    }
   ],
   "queries": [
-    {"name": "user", "ok": true, "user": {...}, "state": {}}
+    {
+      "name": "user",
+      "ok": true,
+      "user": {},
+      "state": {}
+    }
   ]
 }
 ```
 
 ---
 
-## Database
-The server uses **SQLite** (`game_server.db`) stored in `/opt/game_server/` via the `go-sqlite3` driver (CGo). For production at scale, you can swap `database.go` to use PostgreSQL with the `pgx` driver.
+# Database
+
+The backend currently uses SQLite through the `go-sqlite3` driver.
+
+The database is automatically created in the application directory:
+
+```text
+game_server.db
+```
+
+For larger deployments, the database layer can be replaced with PostgreSQL using the `pgx` driver.
 
 ---
 
-## Security Checklist
-- [x] HTTPS via Let's Encrypt (auto-renews)
-- [x] Session validation on all packet requests
-- [x] Nginx rate limiting (add `limit_req_zone` to nginx.conf if needed)
-- [ ] Add `SECRET_KEY` env var for token signing (optional enhancement)
-- [ ] Add IP allowlisting for admin endpoints (optional)
+# Development
+
+If the repository includes the provided Makefile:
+
+```bash
+make deps
+make build
+make run
+```
+
+Equivalent Go commands:
+
+```bash
+go mod tidy
+go build -o game_server .
+./game_server
+```
 
 ---
 
-## File Structure
+# Security
+
+Current security features:
+
+* HTTPS support through Let's Encrypt
+* Session validation on packet requests
+* Nginx reverse proxy
+* Optional Nginx rate limiting
+
+Recommended future improvements:
+
+* [ ] Add a `SECRET_KEY` environment variable for token signing
+* [ ] Add authentication for administrative endpoints
+* [ ] Add IP allowlisting for admin functionality
+* [ ] Add stricter request validation
+* [ ] Add production database backups
+* [ ] Add monitoring and alerting
+
+---
+
+# Project Structure
+
+```text
+game_server/
+├── main.go             # HTTP server and API handlers
+├── database.go         # SQLite database layer
+├── go.mod              # Go module definition
+├── go.sum              # Dependency checksums
+├── gameData.json       # Static game data
+├── game_server         # Compiled binary
+└── game_server.db      # SQLite database (created automatically)
 ```
-/opt/game_server/
-├── main.go            # HTTP server + all route/command/query handlers
-├── database.go        # SQLite database layer
-├── go.mod             # Go module definition
-├── go.sum             # Dependency checksums
-├── gameData.json      # Static game data
-├── game_server        # Compiled binary (after build)
-└── game_server.db     # SQLite database (auto-created on first run)
-```
+
+---
+
+## License
+
+MIT
